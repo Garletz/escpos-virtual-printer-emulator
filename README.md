@@ -4,8 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/your-username/escpos-virtual-printer-emulator)
 
-> **Professional ESC/POS virtual printer emulator built in Rust**  
+> **ESC/POS virtual printer emulator built in Rust**  
 > Transform your computer into a virtual receipt printer for testing and development
+<img width="1920" height="1080" alt="Capture d’écran (280)" src="https://github.com/user-attachments/assets/709335cd-79b9-40fd-ab51-7027f6ee0405" />
+<img width="1920" height="1080" alt="Capture d’écran (281)" src="https://github.com/user-attachments/assets/c02db29b-53ca-49e1-b145-6b7cb31e4fc1" />
+
+
 
 ## ✨ Features
 
