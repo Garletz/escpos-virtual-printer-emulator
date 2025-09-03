@@ -11,17 +11,8 @@
 
 
 
-## ✨ Features
 
-- 🖨️ **Virtual Printer Integration** - Installs as a system printer on Windows/Linux
-- 📡 **Network Support** - TCP/IP server on port 9100 (ESC/POS standard)
-- 🎨 **Modern GUI** - Beautiful egui-based interface with real-time preview
-- 📄 **Receipt Viewer** - Live preview of printed receipts
-- 📋 **Command Log** - Detailed ESC/POS command monitoring
-- ⚙️ **Auto-Configuration** - Respects ESC/POS standards automatically
-- 🚀 **High Performance** - Built with Rust for maximum speed and reliability
-
-## 🎯 Supported Paper Widths
+## Supported Paper Widths
 
 | Width | Characters | Dots | Use Case |
 |-------|------------|------|----------|
@@ -59,7 +50,6 @@
    - Click **"🖨️ Install Windows Printer"** (requires admin)
    - The printer will appear in Windows "Devices and Printers"
 
-## 📖 Usage
 
 ### Basic Usage
 
@@ -68,36 +58,7 @@
 3. **Print from any application** - Select "ESC_POS_Virtual_Printer" as your printer
 4. **View results** - Check the Receipt tab for live preview
 
-### Supported Applications
 
-- ✅ **Microsoft Office** (Word, Excel, PowerPoint)
-- ✅ **Web Browsers** (Chrome, Firefox, Edge)
-- ✅ **POS Systems** (Any ESC/POS compatible software)
-- ✅ **Custom Applications** (Via network port 9100)
-- ✅ **Command Line Tools** (Direct TCP connection)
-
-## 🛠️ Technical Details
-
-### Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Application   │───▶│  Windows/Linux   │───▶│  Virtual Printer│
-│   (Word, Excel) │    │   Print Spooler  │    │   (Port 9100)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                         │
-                                                         ▼
-                                               ┌─────────────────┐
-                                               │  ESC/POS Server │
-                                               │  (Rust/Tokio)   │
-                                               └─────────────────┘
-                                                         │
-                                                         ▼
-                                               ┌─────────────────┐
-                                               │   GUI Preview   │
-                                               │   (egui)        │
-                                               └─────────────────┘
-```
 
 ### ESC/POS Commands Supported
 
@@ -164,44 +125,10 @@ cargo check
 - **tracing** - Structured logging
 - **anyhow/thiserror** - Error handling
 
-## 📊 Performance
 
-- **Memory Usage**: ~10MB RAM
-- **CPU Usage**: <1% when idle
-- **Network Latency**: <1ms local
-- **Startup Time**: <2 seconds
-- **Binary Size**: ~5MB (release build)
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Run tests: `cargo test`
-5. Commit your changes: `git commit -m 'Add amazing feature'`
-6. Push to the branch: `git push origin feature/amazing-feature`
-7. Open a Pull Request
-
-## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- **ESC/POS Standard** - For the printer command specification
-- **Rust Community** - For the amazing ecosystem
-- **egui** - For the beautiful GUI framework
-- **Original C# Project** - [EscPosEmulator](https://github.com/roydejong/EscPosEmulator) for inspiration
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-username/escpos-virtual-printer-emulator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/escpos-virtual-printer-emulator/discussions)
-- **Email**: support@your-domain.com
 
 ---
 
