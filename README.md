@@ -20,7 +20,7 @@
 | **78mm** | 72 chars | 576 dots | Standard receipts |
 | **80mm** | 80 chars | 640 dots | Large receipts, invoices |
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - **Rust 1.70+** - [Install Rust](https://rustup.rs/)
@@ -74,7 +74,7 @@
 | `ESC ! n` | Font size | `\x1B!16` |
 | `ESC m` | Cut paper | `\x1Bm` |
 
-## 🔧 Development
+##  Development
 
 ### Project Structure
 
@@ -131,11 +131,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 
 ---
-
-<div align="center">
-
-**Made with ❤️ in Rust**
-
-[⭐ Star this project](https://github.com/your-username/escpos-virtual-printer-emulator) | [🐛 Report Bug](https://github.com/your-username/escpos-virtual-printer-emulator/issues) | [💡 Request Feature](https://github.com/your-username/escpos-virtual-printer-emulator/issues)
-
-</div>
