@@ -1,0 +1,38 @@
+[package]
+name = "escpos_emulator"
+version = "1.0.0"
+edition = "2021"
+authors = ["ESC/POS Emulator Team"]
+description = "Professional ESC/POS virtual printer emulator built in Rust"
+license = "MIT"
+repository = "https://github.com/your-username/escpos-virtual-printer-emulator"
+keywords = ["escpos", "printer", "emulator", "receipt", "pos", "virtual", "network"]
+categories = ["multimedia", "system"]
+
+[dependencies]
+eframe = "0.26.0"
+egui = "0.26.0"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = "0.24"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package."*"]
+opt-level = 3
+
+[[bin]]
+name = "escpos_emulator"
+path = "src/main.rs"
