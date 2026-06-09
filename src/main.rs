@@ -7,17 +7,14 @@ use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> Result<(), eframe::Error> {
-    // Initialize logging
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
 
     info!("🚀 Starting ESC/POS Emulator...");
 
-    // Create shared emulator state
     let emulator_state = Arc::new(Mutex::new(EmulatorState::new()));
 
-    // Start network server in background
     let server_state = emulator_state.clone();
     tokio::spawn(async move {
         if let Err(e) = server::start_server(server_state).await {
@@ -25,14 +22,15 @@ async fn main() -> Result<(), eframe::Error> {
         }
     });
 
+    let tokio_handle = tokio::runtime::Handle::current();
+
     info!("✅ Emulator initialized successfully");
 
-    // Launch GUI
     let options = eframe::NativeOptions::default();
 
     eframe::run_native(
         "ESC/POS Virtual Printer Emulator",
         options,
-        Box::new(|_cc| Box::new(EscPosEmulatorApp::new(emulator_state))),
+        Box::new(move |_cc| Box::new(EscPosEmulatorApp::new(emulator_state, tokio_handle))),
     )
 }
