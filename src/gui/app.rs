@@ -1,5 +1,6 @@
 use crate::emulator::EmulatorState;
 use crate::gui::{CommandLog, ReceiptViewer, SettingsPanel};
+use crate::networking::serial::SerialHandle;
 use eframe::egui::{CentralPanel, TopBottomPanel};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,29 +18,27 @@ impl Default for Tab {
 
 pub struct EscPosEmulatorApp {
     pub emulator_state: std::sync::Arc<tokio::sync::Mutex<EmulatorState>>,
+    tokio_handle: tokio::runtime::Handle,
     selected_tab: Tab,
     receipt_viewer: ReceiptViewer,
     command_log: CommandLog,
     settings_panel: SettingsPanel,
+    serial_handle: Option<SerialHandle>,
 }
 
-impl Default for EscPosEmulatorApp {
-    fn default() -> Self {
+impl EscPosEmulatorApp {
+    pub fn new(
+        emulator_state: std::sync::Arc<tokio::sync::Mutex<EmulatorState>>,
+        tokio_handle: tokio::runtime::Handle,
+    ) -> Self {
         Self {
-            emulator_state: std::sync::Arc::new(tokio::sync::Mutex::new(EmulatorState::new())),
+            emulator_state,
+            tokio_handle,
             selected_tab: Tab::Receipt,
             receipt_viewer: ReceiptViewer::new(),
             command_log: CommandLog::new(),
             settings_panel: SettingsPanel::default(),
-        }
-    }
-}
-
-impl EscPosEmulatorApp {
-    pub fn new(emulator_state: std::sync::Arc<tokio::sync::Mutex<EmulatorState>>) -> Self {
-        Self {
-            emulator_state,
-            ..Default::default()
+            serial_handle: None,
         }
     }
 }
@@ -52,7 +51,6 @@ impl eframe::App for EscPosEmulatorApp {
 
 impl EscPosEmulatorApp {
     fn show(&mut self, ctx: &eframe::egui::Context) {
-        // Top panel with tabs
         TopBottomPanel::top("tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.selected_tab, Tab::Receipt, "🖨️ Receipt");
@@ -61,7 +59,6 @@ impl EscPosEmulatorApp {
             });
         });
 
-        // Central panel with content
         CentralPanel::default().show(ctx, |ui| {
             match self.selected_tab {
                 Tab::Receipt => {
@@ -71,9 +68,12 @@ impl EscPosEmulatorApp {
                     self.command_log.show(ui, &self.emulator_state);
                 }
                 Tab::Settings => {
-                    if let Ok(mut state) = self.emulator_state.try_lock() {
-                        self.settings_panel.show(ui, &mut state);
-                    }
+                    self.settings_panel.show(
+                        ui,
+                        &mut self.serial_handle,
+                        &self.emulator_state,
+                        &self.tokio_handle,
+                    );
                 }
             }
         });
