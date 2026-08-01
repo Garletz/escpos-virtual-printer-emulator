@@ -117,9 +117,15 @@ impl EscPosParser {
                 Ok(Some((EscPosCommand::SetJustification(j), 3)))
             }
 
-            // Emphasis on/off
-            b'E' => Ok(Some((EscPosCommand::SetEmphasis(true), 2))),
-            b'F' => Ok(Some((EscPosCommand::SetEmphasis(false), 2))),
+            // Emphasis on/off (ESC E n / ESC F n)
+            b'E' => {
+                if data.len() < 3 { return Ok(None); }
+                Ok(Some((EscPosCommand::SetEmphasis(data[2] != 0), 3)))
+            }
+            b'F' => {
+                if data.len() < 3 { return Ok(None); }
+                Ok(Some((EscPosCommand::SetEmphasis(data[2] == 0), 3)))
+            }
 
             // Underline
             b'-' => {
@@ -127,9 +133,15 @@ impl EscPosParser {
                 Ok(Some((EscPosCommand::SetUnderline(data[2] != 0), 3)))
             }
 
-            // Italic on/off
-            b'4' => Ok(Some((EscPosCommand::SetItalic(true), 2))),
-            b'5' => Ok(Some((EscPosCommand::SetItalic(false), 2))),
+            // Italic on/off (ESC 4 n / ESC 5 n)
+            b'4' => {
+                if data.len() < 3 { return Ok(None); }
+                Ok(Some((EscPosCommand::SetItalic(data[2] != 0), 3)))
+            }
+            b'5' => {
+                if data.len() < 3 { return Ok(None); }
+                Ok(Some((EscPosCommand::SetItalic(data[2] == 0), 3)))
+            },
 
             // Line height
             b'3' => {
@@ -154,6 +166,12 @@ impl EscPosParser {
 
             // Paper feed
             b'J' => {
+                if data.len() < 3 { return Ok(None); }
+                Ok(Some((EscPosCommand::LineFeed, 3)))
+            }
+
+            // Paper feed (ESC d n)
+            b'd' => {
                 if data.len() < 3 { return Ok(None); }
                 Ok(Some((EscPosCommand::LineFeed, 3)))
             }

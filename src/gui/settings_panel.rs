@@ -1,8 +1,10 @@
 use crate::emulator::EmulatorState;
 use crate::networking::serial::{list_com_ports, start_serial_listener, SerialHandle};
 use egui::Ui;
+use std::net::{SocketAddr, TcpStream};
 use std::process::Command;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 pub struct SettingsPanel {
@@ -55,10 +57,17 @@ impl SettingsPanel {
                 }
             });
 
-            ui.label("Note: Requires administrator privileges");
+            ui.label("Note: Requires administrator / root privileges");
 
-            if ui.button("🔍 Check Status").clicked() {
-                self.check_printer_status();
+            ui.horizontal(|ui| {
+                if ui.button("🔍 Check Printer Status").clicked() {
+                    self.check_printer_status();
+                }
+            });
+
+            if !self.status_message.is_empty() {
+                ui.separator();
+                ui.label(&self.status_message);
             }
         });
 
@@ -98,9 +107,15 @@ impl SettingsPanel {
             // Baud rate row
             ui.horizontal(|ui| {
                 ui.label("Baud:");
-                let selected_baud = self.baud_rates[self.selected_baud_idx];
+
+                let baud_text = self
+                    .baud_rates
+                    .get(self.selected_baud_idx)
+                    .map(|b| b.to_string())
+                    .unwrap_or_else(|| "9600".to_string());
+
                 egui::ComboBox::from_id_source("baud_rate_select")
-                    .selected_text(selected_baud.to_string())
+                    .selected_text(&baud_text)
                     .show_ui(ui, |ui| {
                         for (i, baud) in self.baud_rates.iter().enumerate() {
                             ui.selectable_value(&mut self.selected_baud_idx, i, baud.to_string());
@@ -108,47 +123,46 @@ impl SettingsPanel {
                     });
             });
 
-            // Start / Stop row
+            // Start / Stop controls
             ui.horizontal(|ui| {
                 if is_running {
-                    if ui.button("⏹ Stop").clicked() {
-                        if let Some(h) = serial_handle.take() {
-                            h.stop();
+                    if ui.button("⏹ Stop Serial Listener").clicked() {
+                        if let Some(handle) = serial_handle.take() {
+                            handle.stop();
+                            self.status_message = "Serial listener stopped.".to_string();
                         }
-                        self.status_message = "Serial listener stopped.".to_string();
                     }
                     ui.colored_label(egui::Color32::GREEN, "● Running");
                 } else {
-                    let can_start = !self.available_ports.is_empty();
+                    let port_name = self.available_ports.get(self.selected_port_idx).cloned();
+                    let baud_rate = self.baud_rates.get(self.selected_baud_idx).copied().unwrap_or(9600);
+
+                    let can_start = port_name.is_some() && !self.available_ports.is_empty();
+
                     if ui
-                        .add_enabled(can_start, egui::Button::new("▶ Start COM Listener"))
+                        .add_enabled(can_start, egui::Button::new("▶ Start Serial Listener"))
                         .clicked()
                     {
-                        let port = self.available_ports[self.selected_port_idx].clone();
-                        let baud = self.baud_rates[self.selected_baud_idx];
-                        match start_serial_listener(
-                            port.clone(),
-                            baud,
-                            emulator_state.clone(),
-                            tokio_handle.clone(),
-                        ) {
-                            Ok(handle) => {
-                                *serial_handle = Some(handle);
-                                self.status_message =
-                                    format!("Listening on {} @ {} baud", port, baud);
-                            }
-                            Err(e) => {
-                                self.status_message = format!("Error: {}", e);
+                        if let Some(port) = port_name {
+                            match start_serial_listener(
+                                port.clone(),
+                                baud_rate,
+                                Arc::clone(emulator_state),
+                                tokio_handle.clone(),
+                            ) {
+                                Ok(handle) => {
+                                    *serial_handle = Some(handle);
+                                    self.status_message = format!("Listening on {} @ {} baud", port, baud_rate);
+                                }
+                                Err(e) => {
+                                    self.status_message = format!("Error: {}", e);
+                                }
                             }
                         }
                     }
                     ui.colored_label(egui::Color32::RED, "● Stopped");
                 }
             });
-
-            if !self.status_message.is_empty() {
-                ui.label(&self.status_message);
-            }
 
             ui.separator();
 
@@ -181,7 +195,7 @@ impl SettingsPanel {
         ui.separator();
 
         ui.group(|ui| {
-            ui.label("ℹ️  Automatic Operation");
+            ui.label("ℹ️ Automatic Operation");
             ui.label("• The emulator automatically respects ESC/POS standards");
             ui.label("• Paper width: 50mm, 78mm, 80mm (auto-detection)");
             ui.label("• Font, justification, emphasis: ESC/POS commands");
@@ -189,112 +203,154 @@ impl SettingsPanel {
         });
     }
 
-    fn install_windows_printer(&self) {
+    fn install_windows_printer(&mut self) {
         let output = Command::new("powershell")
             .args([
                 "-Command",
                 "Add-PrinterPort -Name '127.0.0.1:9100' -PrinterHostAddress '127.0.0.1' -PortNumber 9100; \
                  $driver = (Get-PrinterDriver | Where-Object { $_.Name -like '*Microsoft*' } | Select-Object -First 1).Name; \
                  Add-Printer -Name 'ESC_POS_Virtual_Printer' -DriverName $driver -PortName '127.0.0.1:9100'; \
-                 Write-Host 'Printer installed successfully'"
+                 Write-Host 'Windows printer installed successfully!'",
             ])
             .output();
 
         match output {
             Ok(output) => {
                 if output.status.success() {
-                    println!("✅ {}", String::from_utf8_lossy(&output.stdout));
+                    self.status_message = format!("✅ {}", String::from_utf8_lossy(&output.stdout).trim());
                 } else {
-                    println!("❌ Error: {}", String::from_utf8_lossy(&output.stderr));
+                    self.status_message = format!("❌ Error: {}", String::from_utf8_lossy(&output.stderr).trim());
                 }
             }
-            Err(e) => println!("❌ Cannot execute printer installation: {}", e),
+            Err(e) => self.status_message = format!("❌ Cannot execute PowerShell: {}", e),
         }
     }
 
-    fn install_linux_printer(&self) {
-        let output = Command::new("bash")
-            .args([
-                "-c",
-                "if command -v lpstat &> /dev/null; then \
-                    sudo lpadmin -p ESC_POS_Linux_Printer -E -v socket://127.0.0.1:9100 -m 'Generic Text-Only Printer'; \
-                    sudo lpadmin -d ESC_POS_Linux_Printer; \
-                    echo 'Linux printer installed successfully!'; \
-                else \
-                    echo 'CUPS not found. Please install CUPS first.'; \
-                fi",
-            ])
-            .output();
+    fn install_linux_printer(&mut self) {
+        let cmd = "if command -v lpstat &> /dev/null; then \
+            if command -v pkexec &> /dev/null; then \
+                pkexec lpadmin -p ESC_POS_Linux_Printer -E -v socket://127.0.0.1:9100 -m raw && \
+                pkexec lpadmin -d ESC_POS_Linux_Printer; \
+            else \
+                sudo lpadmin -p ESC_POS_Linux_Printer -E -v socket://127.0.0.1:9100 -m raw && \
+                sudo lpadmin -d ESC_POS_Linux_Printer; \
+            fi; \
+            echo 'Linux printer (ESC_POS_Linux_Printer) installed successfully!'; \
+        else \
+            echo 'CUPS not found. Please install CUPS first.'; \
+        fi";
 
-        match output {
-            Ok(output) => println!("ℹ️  {}", String::from_utf8_lossy(&output.stdout)),
-            Err(e) => println!("ℹ️  Linux installation attempted: {}", e),
-        }
-    }
-
-    fn uninstall_printer(&self) {
-        let output = Command::new("powershell")
-            .args([
-                "-Command",
-                "Remove-Printer -Name 'ESC_POS_Virtual_Printer' -Confirm:$false; \
-                 Remove-PrinterPort -Name '127.0.0.1:9100'; \
-                 Write-Host 'Printer uninstalled successfully'",
-            ])
-            .output();
+        let output = Command::new("bash").args(["-c", cmd]).output();
 
         match output {
             Ok(output) => {
-                if output.status.success() {
-                    println!("✅ {}", String::from_utf8_lossy(&output.stdout));
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                if output.status.success() && !stdout.is_empty() {
+                    self.status_message = format!("✅ {}", stdout);
+                } else if !stderr.is_empty() {
+                    self.status_message = format!("ℹ️ {}", stderr);
                 } else {
-                    println!("❌ Error: {}", String::from_utf8_lossy(&output.stderr));
+                    self.status_message = "✅ Installation command sent.".to_string();
                 }
             }
-            Err(e) => println!("❌ Cannot execute printer uninstallation: {}", e),
+            Err(e) => self.status_message = format!("❌ Cannot execute bash: {}", e),
         }
     }
 
-    fn check_printer_status(&self) {
-        let output = Command::new("powershell")
-            .args([
-                "-Command",
-                "Get-Printer -Name 'ESC_POS_Virtual_Printer' -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, PrinterStatus",
-            ])
-            .output();
+    fn uninstall_printer(&mut self) {
+        if cfg!(target_os = "windows") {
+            let output = Command::new("powershell")
+                .args([
+                    "-Command",
+                    "Remove-Printer -Name 'ESC_POS_Virtual_Printer' -Confirm:$false; \
+                     Remove-PrinterPort -Name '127.0.0.1:9100'; \
+                     Write-Host 'Printer uninstalled successfully'",
+                ])
+                .output();
 
-        match output {
-            Ok(output) if output.status.success() => {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if stdout.trim().is_empty() {
-                    println!("ℹ️  Virtual printer not installed");
-                } else {
-                    println!("✅ Virtual printer installed:\n{}", stdout);
+            match output {
+                Ok(output) => {
+                    if output.status.success() {
+                        self.status_message = format!("✅ {}", String::from_utf8_lossy(&output.stdout).trim());
+                    } else {
+                        self.status_message = format!("❌ Error: {}", String::from_utf8_lossy(&output.stderr).trim());
+                    }
                 }
+                Err(e) => self.status_message = format!("❌ Cannot execute PowerShell: {}", e),
             }
-            Ok(_) => println!("❌ Could not check printer status"),
-            Err(e) => println!("❌ Cannot check status: {}", e),
+        } else {
+            let cmd = "if command -v pkexec &> /dev/null; then \
+                pkexec lpadmin -x ESC_POS_Linux_Printer; \
+            else \
+                sudo lpadmin -x ESC_POS_Linux_Printer; \
+            fi";
+            let output = Command::new("bash").args(["-c", cmd]).output();
+            match output {
+                Ok(output) => {
+                    if output.status.success() {
+                        self.status_message = "✅ Linux printer (ESC_POS_Linux_Printer) uninstalled successfully.".to_string();
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                        self.status_message = format!("❌ Uninstall failed: {}", stderr);
+                    }
+                }
+                Err(e) => self.status_message = format!("❌ Cannot execute bash: {}", e),
+            }
         }
     }
 
-    fn test_network_connection(&self) {
-        let output = Command::new("powershell")
-            .args([
-                "-Command",
-                "Test-NetConnection -ComputerName 127.0.0.1 -Port 9100 -WarningAction SilentlyContinue | Select-Object TcpTestSucceeded",
-            ])
-            .output();
+    fn check_printer_status(&mut self) {
+        if cfg!(target_os = "windows") {
+            let output = Command::new("powershell")
+                .args([
+                    "-Command",
+                    "Get-Printer -Name 'ESC_POS_Virtual_Printer' -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, PrinterStatus",
+                ])
+                .output();
 
-        match output {
-            Ok(output) if output.status.success() => {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if stdout.contains("True") {
-                    println!("✅ Connection to port 9100 successful");
-                } else {
-                    println!("❌ Connection to port 9100 failed");
+            match output {
+                Ok(output) if output.status.success() => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    if stdout.trim().is_empty() {
+                        self.status_message = "ℹ️ Virtual printer not installed on Windows".to_string();
+                    } else {
+                        self.status_message = format!("✅ Virtual printer installed:\n{}", stdout);
+                    }
+                }
+                Ok(_) => self.status_message = "❌ Could not check printer status".to_string(),
+                Err(e) => self.status_message = format!("❌ Cannot check status: {}", e),
+            }
+        } else {
+            let output = Command::new("bash")
+                .args(["-c", "lpstat -p ESC_POS_Linux_Printer 2>&1"])
+                .output();
+
+            match output {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if stdout.contains("printer ESC_POS_Linux_Printer") {
+                        self.status_message = format!("✅ Printer Status:\n{}", stdout);
+                    } else {
+                        self.status_message = format!("ℹ️ Linux virtual printer not installed (or not found). Output:\n{}", stdout);
+                    }
+                }
+                Err(e) => self.status_message = format!("❌ Cannot execute lpstat: {}", e),
+            }
+        }
+    }
+
+    fn test_network_connection(&mut self) {
+        let addr_res = "127.0.0.1:9100".parse::<SocketAddr>();
+        if let Ok(addr) = addr_res {
+            match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+                Ok(_) => {
+                    self.status_message = "✅ Connection to TCP port 9100 successful (Emulator is listening)".to_string();
+                }
+                Err(e) => {
+                    self.status_message = format!("❌ Connection to TCP port 9100 failed: {}", e);
                 }
             }
-            Ok(_) => println!("❌ Cannot test connection"),
-            Err(e) => println!("❌ Cannot test connection: {}", e),
         }
     }
 }
