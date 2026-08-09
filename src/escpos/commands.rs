@@ -35,14 +35,14 @@ pub enum EscPosCommand {
     Unknown(Vec<u8>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Font {
     FontA,
     FontB,
     FontC,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Justification {
     Left,
     Center,

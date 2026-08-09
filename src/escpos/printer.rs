@@ -29,10 +29,21 @@ impl PaperWidth {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TextLine {
+    pub text: String,
+    pub font: Font,
+    pub justification: Justification,
+    pub emphasis: bool,
+    pub underline: bool,
+    pub italic: bool,
+    pub font_size: u32,
+}
+
 /// A single line element in the receipt buffer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ReceiptLine {
-    Text(String),
+    Text(TextLine),
     /// Monochrome bitmap: width in pixels, height in pixels, 1-bit-per-pixel packed data
     Bitmap { width_px: u32, height_px: u32, data: Vec<u8> },
     Separator,
@@ -125,25 +136,55 @@ impl PrinterState {
     }
 
     fn add_text(&mut self, text: &str) {
-        if let Some(ReceiptLine::Text(last_line)) = self.buffer.last_mut() {
-            let max_chars = self.paper_width.get_max_chars(self.font_size);
-            let current_length = last_line.chars().count();
+        let current_line_style = TextLine {
+            text: String::new(),
+            font: self.current_font.clone(),
+            justification: self.justification.clone(),
+            emphasis: self.emphasis,
+            underline: self.underline,
+            italic: self.italic,
+            font_size: self.font_size,
+        };
 
-            if current_length + text.chars().count() > max_chars as usize {
-                self.add_new_line();
-                if let Some(ReceiptLine::Text(new_line)) = self.buffer.last_mut() {
-                    new_line.push_str(text);
+        if let Some(ReceiptLine::Text(last_line)) = self.buffer.last_mut() {
+            let matches_style = last_line.font == current_line_style.font
+                && last_line.justification == current_line_style.justification
+                && last_line.emphasis == current_line_style.emphasis
+                && last_line.underline == current_line_style.underline
+                && last_line.italic == current_line_style.italic
+                && last_line.font_size == current_line_style.font_size;
+
+            if matches_style {
+                let max_chars = self.paper_width.get_max_chars(self.font_size);
+                let current_length = last_line.text.chars().count();
+
+                if current_length + text.chars().count() > max_chars as usize {
+                    let mut new_line = current_line_style;
+                    new_line.text.push_str(text);
+                    self.buffer.push(ReceiptLine::Text(new_line));
+                } else {
+                    last_line.text.push_str(text);
                 }
-            } else {
-                last_line.push_str(text);
+                return;
             }
-        } else {
-            self.buffer.push(ReceiptLine::Text(text.to_string()));
         }
+
+        let mut new_line = current_line_style;
+        new_line.text.push_str(text);
+        self.buffer.push(ReceiptLine::Text(new_line));
     }
 
     fn add_new_line(&mut self) {
-        self.buffer.push(ReceiptLine::Text(String::new()));
+        let line = TextLine {
+            text: String::new(),
+            font: self.current_font.clone(),
+            justification: self.justification.clone(),
+            emphasis: self.emphasis,
+            underline: self.underline,
+            italic: self.italic,
+            font_size: self.font_size,
+        };
+        self.buffer.push(ReceiptLine::Text(line));
     }
 
     fn add_separator(&mut self) {
